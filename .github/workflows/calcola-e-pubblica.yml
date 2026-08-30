@@ -1,0 +1,160 @@
+name: Calcola GW e aggiorna dashboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'formazioni/formazioni_GW*.xlsx'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  calcola:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Trova ultima GW
+        id: gw
+        shell: bash
+        run: |
+          FILE=$(ls formazioni/formazioni_GW*.xlsx | sort -V | tail -1)
+          BASENAME=$(basename "$FILE")
+          GW=$(echo "$BASENAME" | sed -E 's/formazioni_GW([0-9]+)\.xlsx/\1/')
+
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "gw=$GW" >> "$GITHUB_OUTPUT"
+
+          echo "File trovato: $FILE"
+          echo "GW trovata: $GW"
+
+      - name: Recupera date della GW
+        id: dates
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          GW: ${{ steps.gw.outputs.gw }}
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const gw = process.env.GW;
+          const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+
+          const url =
+            `https://api.football-data.org/v4/competitions/SA/matches?season=2026&matchday=${gw}`;
+
+          const response = await fetch(url, {
+            headers: {
+              'X-Auth-Token': apiKey
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Football Data API error: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (!data.matches || data.matches.length === 0) {
+            throw new Error(`Nessuna partita trovata per GW${gw}`);
+          }
+
+          const dates = data.matches.map(m => new Date(m.utcDate));
+
+          const minDate = new Date(Math.min(...dates));
+          const maxDate = new Date(Math.max(...dates));
+
+          const pad = n => String(n).padStart(2, '0');
+
+          function formatDate(d) {
+            return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+          }
+
+          const from = formatDate(minDate);
+          const to = formatDate(maxDate);
+
+          const fs = await import('fs');
+
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `from=${from}\nto=${to}\n`
+          );
+
+          console.log(`GW${gw}: ${from} -> ${to}`);
+          NODE
+
+      - name: Calcola Fantastats
+        run: |
+          node calcola.js \
+            "${{ steps.gw.outputs.file }}" \
+            "${{ steps.gw.outputs.gw }}" \
+            --from="${{ steps.dates.outputs.from }}" \
+            --to="${{ steps.dates.outputs.to }}"
+
+      - name: Rigenera dashboard data
+        run: node genera-dashboard-data.js
+
+      - name: Salva risultati aggiornati nella repo
+        shell: bash
+        run: |
+          git config user.name "Fantastats Bot"
+          git config user.email "actions@github.com"
+
+          git add fantastats_stagione.xlsx
+          git add statistiche_giocatori.xlsx
+          git add dashboard-data.js
+
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica da salvare"
+          else
+            git commit -m "Aggiorna risultati GW${{ steps.gw.outputs.gw }}"
+            git push
+          fi
+
+      - name: Prepara sito
+        shell: bash
+        run: |
+          mkdir -p public
+          cp dashboard.html public/index.html
+          cp dashboard-data.js public/dashboard-data.js
+
+      - name: Configura GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Carica sito Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy:
+    needs: calcola
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    permissions:
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Pubblica dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4
