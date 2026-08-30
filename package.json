@@ -1,0 +1,14 @@
+{
+  "name": "fantastats-spinoff",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Calcolo giornate Fantastats standalone (Excel-in / Excel-out), slegato dall'app",
+  "scripts": {
+    "genera-listone": "node genera-listone-slug.js",
+    "calcola": "node calcola.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "^0.18.5"
+  }
+}
