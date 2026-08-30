@@ -110,7 +110,7 @@ jobs:
       - name: Rigenera dashboard data
         run: node genera-dashboard-data.js
 
-      - name: Salva risultati aggiornati nella repo
+            - name: Salva risultati aggiornati nella repo
         shell: bash
         run: |
           git config user.name "Fantastats Bot"
@@ -124,7 +124,9 @@ jobs:
             echo "Nessuna modifica da salvare"
           else
             git commit -m "Aggiorna risultati GW${{ steps.gw.outputs.gw }}"
-            git push
+
+            git pull --rebase origin main
+            git push origin main
           fi
 
       - name: Prepara sito
