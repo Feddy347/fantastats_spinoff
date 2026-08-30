@@ -110,7 +110,7 @@ jobs:
       - name: Rigenera dashboard data
         run: node genera-dashboard-data.js
 
-            - name: Salva risultati aggiornati nella repo
+      - name: Salva risultati aggiornati nella repo
         shell: bash
         run: |
           git config user.name "Fantastats Bot"
