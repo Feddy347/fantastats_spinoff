@@ -135,6 +135,7 @@ jobs:
           mkdir -p public
           cp dashboard.html public/index.html
           cp dashboard-data.js public/dashboard-data.js
+          cp regolamento.html public/regolamento.html
 
       - name: Configura GitHub Pages
         uses: actions/configure-pages@v5
