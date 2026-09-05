@@ -136,6 +136,7 @@ jobs:
           cp dashboard.html public/index.html
           cp dashboard-data.js public/dashboard-data.js
           cp regolamento.html public/regolamento.html
+          cp dashboard-v3.js public/dashboard-v3.js
 
       - name: Configura GitHub Pages
         uses: actions/configure-pages@v5
