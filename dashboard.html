@@ -246,7 +246,7 @@ button,input,select{font:inherit}
 
 .grid3{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
   gap:18px;
 }
 
@@ -725,6 +725,38 @@ button,input,select{font:inherit}
 .breakdown-row .value.positive{color:#16794a}
 .breakdown-row .value.negative{color:#b42318}
 .breakdown-empty{padding:12px;color:var(--muted);font-size:13px}
+
+.roster-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.roster-stat{
+  padding:16px;
+  border:1px solid var(--line);
+  background:#f4faf6;
+  border-radius:14px;
+}
+.roster-stat small{
+  display:block;
+  color:var(--muted);
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  margin-bottom:4px;
+}
+.roster-stat strong{
+  font-size:22px;
+  color:var(--accent);
+}
+.roster-team-card .go{
+  margin-top:14px;
+  color:var(--accent);
+  font-weight:700;
+  font-size:13px;
+}
+
 @media(max-width:850px){
   .hero,
   .grid3,
@@ -789,7 +821,7 @@ button,input,select{font:inherit}
 </style>
 </head>
 <body><div class="app">
-<div class="topbar"><div class="brand" onclick="goHome()"><div class="mark">FS</div><div><h1>FANTASTATS</h1><small>Statistiche che diventano fantacalcio</small></div></div><div class="nav-actions"><button class="ghost" onclick="openLeague('classic')">SWOS League</button><button class="ghost" onclick="openLeague('mantra')">PremierMantra</button><button class="ghost" onclick="openPlayers()">Statistiche</button><button class="ghost" onclick="location.href='regolamento.html'">Regolamento</button></div></div>
+<div class="topbar"><div class="brand" onclick="goHome()"><div class="mark">FS</div><div><h1>FANTASTATS</h1><small>Statistiche che diventano fantacalcio</small></div></div><div class="nav-actions"><button class="ghost" onclick="openLeague('classic')">SWOS League</button><button class="ghost" onclick="openLeague('mantra')">PremierMantra</button><button class="ghost" onclick="openPlayers()">Statistiche</button><button class="ghost" onclick="openRosters()">Rose</button></div></div>
 <main id="view"></main>
 </div>
 <div id="playerModalBackdrop" class="modal-backdrop" onclick="modalBackdropClick(event)">
@@ -816,13 +848,16 @@ function openLeague(id){location.hash='league/'+id}
 function openCompetition(id){location.hash='comp/'+id}
 function openGw(id,gw){location.hash=`gw/${id}/${gw}`}
 function openPlayers(){location.hash='players'}
+function openRosters(){location.hash='rosters'}
+function openRosterLeague(id){location.hash=`rosters/${id}`}
+function openRosterTeam(id,team){location.hash=`roster/${id}/${encodeURIComponent(team)}`}
 function countdown(){const el=document.getElementById('clock'); if(!el)return; const d=new Date(DATA.nextGw.kickoff)-new Date(); if(d<=0){el.textContent='Giornata iniziata';return} const days=Math.floor(d/86400000),h=Math.floor(d%86400000/3600000),m=Math.floor(d%3600000/60000),s=Math.floor(d%60000/1000);el.textContent=`${days}g ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`}
 setInterval(countdown,1000);
 function renderHome(){
  const lastGw=Math.max(...DATA.competitions.flatMap(c=>c.gws||[0]));
  view.innerHTML=`<section class="hero"><div class="hero-card"><div class="eyebrow">${esc(todayText())}</div><h2>Il laboratorio del fantacalcio statistico.</h2><p>Confronta Classic, Mantra, Fantastats 7, Formula 1 e Flop XI usando i dati reali dei giocatori e la matrice Fantastats.</p></div><div class="countdown"><div class="label">Prossima giornata di Serie A</div><div class="gw">GW${DATA.nextGw.number} · ${esc(DATA.nextGw.label)}</div><div class="clock" id="clock"></div><div class="kick">Primo calcio d'inizio: ${new Date(DATA.nextGw.kickoff).toLocaleString('it-IT',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</div></div></section>
- <section class="grid3"><div class="tile" onclick="openLeague('classic')"><div class="icon">⚽</div><h3>SWOS League</h3><p>Classic · 10 utenti · 5 competizioni di test</p><div class="go">Entra nella lega →</div></div><div class="tile" onclick="openLeague('mantra')"><div class="icon">♟️</div><h3>PremierMantra</h3><p>Mantra · 6 utenti · 5 competizioni di test</p><div class="go">Entra nella lega →</div></div><div class="tile" onclick="openPlayers()"><div class="icon">📊</div><h3>Statistiche giocatori</h3><p>${DATA.players.length} giocatori · dettaglio cumulativo e per GW</p><div class="go">Esplora i dati →</div></div></section>`;countdown();}
-function renderLeague(id){const l=DATA.leagues[id];const comps=DATA.competitions.filter(c=>c.league===id);view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / ${esc(l.name)}</div><div class="section-head"><div><h2>${esc(l.name)}</h2><p>${esc(l.type)} · scegli una competizione</p></div></div><div class="comp-grid">${comps.map(c=>`<div class="comp-card" onclick="openCompetition('${c.id}')"><h3>${esc(c.title)}</h3><p>${esc(c.subtitle)}</p></div>`).join('')}</div>`}
+ <section class="grid3"><div class="tile" onclick="openLeague('classic')"><div class="icon">⚽</div><h3>SWOS League</h3><p>Classic · 10 utenti · 5 competizioni di test</p><div class="go">Entra nella lega →</div></div><div class="tile" onclick="openLeague('mantra')"><div class="icon">♟️</div><h3>PremierMantra</h3><p>Mantra · 6 utenti · 5 competizioni di test</p><div class="go">Entra nella lega →</div></div><div class="tile" onclick="openPlayers()"><div class="icon">📊</div><h3>Statistiche giocatori</h3><p>${DATA.players.length} giocatori · dettaglio cumulativo e per GW</p><div class="go">Esplora i dati →</div></div><div class="tile" onclick="openRosters()"><div class="icon">👥</div><h3>Rose</h3><p>Consulta le rose aggiornate di SWOS League e PremierMantra</p><div class="go">Apri le rose →</div></div></section>`;countdown();}
+function renderLeague(id){const l=DATA.leagues[id];const comps=DATA.competitions.filter(c=>c.league===id);view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / ${esc(l.name)}</div><div class="section-head"><div><h2>${esc(l.name)}</h2><p>${esc(l.type)} · scegli una competizione</p></div><button class="ghost" onclick="openRosterLeague('${id}')">Rose della lega</button></div><div class="comp-grid">${comps.map(c=>`<div class="comp-card" onclick="openCompetition('${c.id}')"><h3>${esc(c.title)}</h3><p>${esc(c.subtitle)}</p></div>`).join('')}</div>`}
 function standingsTable(c){
   if(!c.standings.length) return '<p>Nessun dato.</p>'
 
@@ -1040,6 +1075,94 @@ function formulaOne(c,gw,p){return `<div class="panel"><h3>Classifica di giornat
 function renderGw(id,gw){const c=compById[id],p=c.gameweeks[String(gw)],league=DATA.leagues[c.league];let body=!p?'<div class="note">Dati non disponibili.</div>':p.kind==='direct'?directMatches(c,gw,p):p.kind==='roundrobin'?roundRobin(c,gw,p):formulaOne(c,gw,p);view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / <span onclick="openLeague('${c.league}')">${esc(league.name)}</span> / <span onclick="openCompetition('${c.id}')">${esc(c.title)}</span> / GW${gw}</div><div class="section-head"><div><h2>${esc(c.title)} · GW${gw}</h2><p>${esc(c.subtitle)}</p></div></div>${body}`}
 function toggleLineup(id,b){const e=document.getElementById(id);e.classList.toggle('open');b.textContent=e.classList.contains('open')?'Nascondi formazioni ▴':'Mostra formazioni e voti ▾'}
 let playerSort={key:'punteggio',dir:-1},playerMode='normal';
+
+function rosterLeagueData(id){
+  return (DATA.rosters||{})[id]||{}
+}
+
+function renderRosters(){
+  const cards=['classic','mantra'].map(id=>{
+    const league=DATA.leagues[id]
+    const teams=Object.keys(rosterLeagueData(id))
+    const players=teams.reduce((sum,t)=>sum+(rosterLeagueData(id)[t]?.length||0),0)
+    return `<div class="comp-card roster-team-card" onclick="openRosterLeague('${id}')">
+      <h3>${esc(league?.name||id)}</h3>
+      <p>${teams.length} squadre · ${players} giocatori in rosa</p>
+      <div class="go">Apri le rose →</div>
+    </div>`
+  }).join('')
+
+  view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / Rose</div>
+    <div class="section-head"><div><h2>Rose</h2><p>Consulta le rose aggiornate delle leghe.</p></div></div>
+    <div class="comp-grid">${cards}</div>`
+}
+
+function renderRosterLeague(id){
+  const league=DATA.leagues[id]
+  const data=rosterLeagueData(id)
+  const teams=Object.keys(data).sort((a,b)=>a.localeCompare(b,'it'))
+
+  view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / <span onclick="openRosters()">Rose</span> / ${esc(league?.name||id)}</div>
+    <div class="section-head"><div><h2>${esc(league?.name||id)}</h2><p>Seleziona una squadra per vedere la rosa completa.</p></div></div>
+    <div class="comp-grid">${teams.map(team=>{
+      const rows=data[team]||[]
+      const budget=rows.reduce((s,r)=>s+n(r.costo),0)
+      return `<div class="comp-card roster-team-card" onclick="openRosterTeam('${id}',decodeURIComponent('${encodeURIComponent(team)}'))">
+        <h3>${esc(team)}</h3>
+        <p>${rows.length} giocatori${budget?` · ${fmt(budget)} crediti`:''}</p>
+        <div class="go">Vedi rosa →</div>
+      </div>`
+    }).join('')}</div>`
+}
+
+function renderRosterTeam(id,team){
+  const league=DATA.leagues[id]
+  const rows=(rosterLeagueData(id)[team]||[]).slice()
+  const roleKey=id==='classic'?'ruolo_classic':'ruolo_mantra'
+
+  const classicOrder={P:0,D:1,C:2,A:3}
+  const mantraOrder={Por:0,Dc:1,Dd:2,Ds:3,E:4,M:5,C:6,W:7,T:8,A:9,Pc:10}
+
+  rows.sort((a,b)=>{
+    const ra=String(a[roleKey]||'').split(';')[0].trim()
+    const rb=String(b[roleKey]||'').split(';')[0].trim()
+    const oa=id==='classic'?(classicOrder[ra]??99):(mantraOrder[ra]??99)
+    const ob=id==='classic'?(classicOrder[rb]??99):(mantraOrder[rb]??99)
+    return oa-ob || String(a.giocatore).localeCompare(String(b.giocatore),'it')
+  })
+
+  const budget=rows.reduce((s,r)=>s+n(r.costo),0)
+
+  view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / <span onclick="openRosters()">Rose</span> / <span onclick="openRosterLeague('${id}')">${esc(league?.name||id)}</span> / ${esc(team)}</div>
+    <div class="section-head"><div><h2>${esc(team)}</h2><p>${esc(league?.name||'')} · rosa aggiornata</p></div></div>
+    <div class="roster-summary">
+      <div class="roster-stat"><small>Giocatori</small><strong>${rows.length}</strong></div>
+      <div class="roster-stat"><small>Crediti rosa</small><strong>${budget?fmt(budget):'—'}</strong></div>
+    </div>
+    <div class="panel">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr>
+            <th>Giocatore</th>
+            <th>Squadra</th>
+            <th>Costo</th>
+            <th>Classic</th>
+            <th>Mantra</th>
+            <th>Fantastats</th>
+          </tr></thead>
+          <tbody>${rows.map(r=>`<tr>
+            <td><strong>${esc(r.giocatore)}</strong></td>
+            <td>${esc(r.squadra||'—')}</td>
+            <td>${r.costo==null?'—':esc(fmt(r.costo))}</td>
+            <td>${esc(r.ruolo_classic||'—')}</td>
+            <td>${esc(r.ruolo_mantra||'—')}</td>
+            <td>${esc(r.ruolo_fantastats||'—')}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`
+}
+
 function renderPlayers(){const roles=[...new Set(DATA.players.map(p=>p.ruolo).filter(Boolean))].sort();const teams=[...new Set(DATA.players.map(p=>p.squadra).filter(Boolean))].sort();view.innerHTML=`<div class="breadcrumb"><span onclick="goHome()">Home</span> / Statistiche giocatori</div><div class="section-head"><div><h2>Statistiche giocatori</h2><p>Ordina, filtra e confronta le prestazioni. Lo switch Normale / Flop XI usa i due punteggi reali calcolati dal motore.</p></div></div><div class="toolbar"><input id="pq" class="search" placeholder="Cerca giocatore o squadra…" oninput="drawPlayerTable()"><select id="prole" class="select" onchange="drawPlayerTable()"><option value="">Tutti i ruoli</option>${roles.map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="pteam" class="select" onchange="drawPlayerTable()"><option value="">Tutte le squadre</option>${teams.map(x=>`<option>${esc(x)}</option>`).join('')}</select><div class="seg"><button id="normalBtn" class="active" onclick="setPlayerMode('normal')">Normale</button><button id="flopBtn" onclick="setPlayerMode('flop')">Flop XI</button></div></div><div id="flopNote" class="note hidden"></div><div class="panel"><div class="table-scroll stats-scroll"><table class="data-table stats-table"><thead id="phead"></thead><tbody id="pbody"></tbody></table></div></div>`;drawPlayerTable()}
 const playerCols=[['nome','Giocatore'],['squadra','Squadra'],['ruolo','R'],['presenze','PG'],['minuti','Min'],['punteggio','Punteggio'],['gol','Gol'],['assist','Assist'],['tiri_in_porta','Tiri in porta'],['big_chance_create','Big chance'],['precisione_passaggi','Prec. pass.'],['contrasti_vinti','Contrasti'],['intercetti','Intercetti'],['duelli_vinti','Duelli'],['salvataggi_linea','Salv. linea'],['parate','Parate'],['rigori_parati','Rigori parati'],['gol_subiti','Gol subiti'],['clean_sheet','Clean sheet'],['falli','Falli'],['autogol','Autogol'],['errori_gol','Errori→gol'],['dribbling_vinti','Dribbling'],['ammonizioni','Amm.'],['espulsioni','Esp.']];
 function mergedPlayers(){
@@ -1095,7 +1218,7 @@ function drawPlayerTable(){const q=(document.getElementById('pq')?.value||'').to
               : fmt(r.punteggio)
           )
     ):esc(fmtOrText(r[k]))}</td>`).join('')}</tr>`).join('')}
-function route(){const h=(location.hash||'#home').slice(1).split('/');if(h[0]==='league')renderLeague(h[1]);else if(h[0]==='comp')renderCompetition(h[1]);else if(h[0]==='gw')renderGw(h[1],Number(h[2]));else if(h[0]==='players')renderPlayers();else renderHome()}
+function route(){const h=(location.hash||'#home').slice(1).split('/');if(h[0]==='league')renderLeague(h[1]);else if(h[0]==='comp')renderCompetition(h[1]);else if(h[0]==='gw')renderGw(h[1],Number(h[2]));else if(h[0]==='players')renderPlayers();else if(h[0]==='rosters'&&h[1])renderRosterLeague(h[1]);else if(h[0]==='rosters')renderRosters();else if(h[0]==='roster'&&h[1]&&h[2])renderRosterTeam(h[1],decodeURIComponent(h.slice(2).join('/')));else renderHome()}
 window.addEventListener('hashchange',route);route();
 </script>
 </body></html>

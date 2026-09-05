@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 const ROOT = process.cwd()
 const SEASON_FILE = path.join(ROOT, 'fantastats_stagione.xlsx')
 const STATS_FILE = path.join(ROOT, 'statistiche_giocatori.xlsx')
+const ROSE_FILE = path.join(ROOT, 'rose.xlsx')
 const FORMATIONS_DIR = path.join(ROOT, 'formazioni')
 const OUTPUT_FILE = path.join(ROOT, 'dashboard-data.js')
 
@@ -118,6 +119,56 @@ function readFormationData(playerGw) {
   return { formations, classicCalendars }
 }
 
+
+function readRosters() {
+  if (!fs.existsSync(ROSE_FILE)) {
+    throw new Error(`File non trovato: ${ROSE_FILE}`)
+  }
+
+  const wb = XLSX.readFile(ROSE_FILE)
+  const rosterRows = rows(wb, 'Rose')
+
+  const rosters = {
+    classic: {},
+    mantra: {},
+  }
+
+  for (const r of rosterRows) {
+    const rawLeague = String(r.lega ?? '').trim().toLowerCase()
+    const league =
+      rawLeague === 'classic' ? 'classic' :
+      rawLeague === 'mantra' ? 'mantra' :
+      null
+
+    const user = String(r.utente ?? '').trim()
+    const player = String(r.giocatore ?? '').trim()
+
+    if (!league || !user || !player) continue
+
+    if (!rosters[league][user]) rosters[league][user] = []
+
+    rosters[league][user].push({
+      id: r.id ?? null,
+      giocatore: player,
+      squadra: String(r.squadra ?? '').trim(),
+      costo: r.costo ?? null,
+      ruolo_classic: String(r.ruolo_classic ?? '').trim(),
+      ruolo_mantra: String(r.ruolo_mantra ?? '').trim(),
+      ruolo_fantastats: String(r.ruolo_fantastats ?? '').trim(),
+    })
+  }
+
+  for (const league of Object.keys(rosters)) {
+    for (const user of Object.keys(rosters[league])) {
+      rosters[league][user].sort((a, b) =>
+        String(a.giocatore).localeCompare(String(b.giocatore), 'it')
+      )
+    }
+  }
+
+  return rosters
+}
+
 function buildDetails(detailRows) {
   const details = {}
   for (const raw of detailRows) {
@@ -220,6 +271,7 @@ export function generateDashboardData() {
   const detailRaw = rows(seasonWb, '_dettaglio_giornate')
   const players = rows(statsWb, 'Riepilogo')
   const playerGw = rows(statsWb, '_per_gw')
+  const rosters = readRosters()
   const { formations, classicCalendars } = readFormationData(playerGw)
   const details = buildDetails(detailRaw)
 
@@ -251,6 +303,7 @@ export function generateDashboardData() {
       mantra:{name:'PremierMantra',type:'Mantra · 6 utenti'},
     },
     competitions,
+    rosters,
     formations,
     details,
     players,
