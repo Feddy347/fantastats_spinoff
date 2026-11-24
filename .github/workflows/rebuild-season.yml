@@ -11,6 +11,8 @@ on:
       - 'test/repair-toro-gw12.js'
       - 'lib/playerIdentity.js'
       - 'lib/calcolaModalita.js'
+      - 'lib/partialFs7.js'
+      - 'test/partialFs7.test.js'
 permissions:
   contents: write
 jobs:
@@ -28,6 +30,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Test inferiorita numerica Fantastats7
+        run: node --test test/partialFs7.test.js
       - name: Ripristina formazione TORO LOCO da screenshot
         run: |
           test "$GITHUB_REF" = refs/heads/fix/gameweek-retrieval
@@ -61,6 +65,7 @@ jobs:
           for(let gw=1;gw<=12;gw++)assert.equal(rows.filter(r=>Number(r.gw)===gw).length,80)
           assert.equal(new Set(rows.map(r=>[r.gw,r.fanta,r.modalita,r.utente].join('|'))).size,960)
           assert(rows.every(r=>Number.isFinite(r.punteggio)))
+          for(let gw=6;gw<=11;gw++)assert(rows.find(r=>r.gw===gw&&r.modalita==='C_fanta7'&&r.utente==='Schiaffield Wednesday')?.punteggio>0, 'Schiaffield FS7 GW'+gw)
           const stats=XLSX.readFile('rebuild-results/statistiche_giocatori.xlsx',{sheets:['_per_gw']})
           const rr=XLSX.utils.sheet_to_json(stats.Sheets._per_gw)
           assert.equal(rr.find(r=>Number(r.gw)===12&&Number(r.id)===5585)?.gol,4)
