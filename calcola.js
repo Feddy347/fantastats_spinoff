@@ -1,7 +1,7 @@
 // Uso: node calcola.js formazioni/formazioni_GW12.xlsx [--dry-run] [--season=2026]
 // Il nome del file identifica la giornata ufficiale. Nessuna finestra relativa a oggi.
 import XLSX from 'xlsx'
-import { generateDashboardData } from './genera-dashboard-data.js'
+import { generateV4 } from './genera-dashboard-v4.js'
 import { loadEnv } from './lib/env.js'
 loadEnv()
 import { retrieveMatchday } from './lib/matchday.js'
@@ -78,7 +78,7 @@ async function main() {
   const { computeAllModes } = await import('./lib/calcolaModalita.js')
   await computeAllModes({ formazioniPath, gw, listone, statsById, flags })
   try {
-  if (!flags.out && !flags.statsOut) generateDashboardData()
+  if (!flags.out && !flags.statsOut) generateV4()
 } catch (e) {
   console.warn(`Dashboard non aggiornata: ${e.message}`)
 }

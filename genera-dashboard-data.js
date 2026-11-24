@@ -446,7 +446,7 @@ function currentPercentiles({
   }
 }
 
-function buildDetails(detailRows, playerPerformance, playerGwIndex, rosters) {
+function buildDetails(detailRows, playerPerformance, playerGwIndex, rosters, compact=false) {
   const details = {}
 
   for (const raw of detailRows) {
@@ -497,7 +497,7 @@ function buildDetails(detailRows, playerPerformance, playerGwIndex, rosters) {
       breakdown,
       action_details:actionDetails,
       percentiles,
-      season:profile,
+      ...(compact ? {} : {season:profile}),
     })
   }
 
@@ -607,7 +607,7 @@ function formulaOneGameweek(scoreMap) {
   }
 }
 
-export function generateDashboardData() {
+export function generateDashboardData({write=true, compact=false}={}) {
   if (!fs.existsSync(SEASON_FILE)) throw new Error(`File non trovato: ${SEASON_FILE}`)
   if (!fs.existsSync(STATS_FILE)) throw new Error(`File non trovato: ${STATS_FILE}`)
 
@@ -628,7 +628,7 @@ export function generateDashboardData() {
     detailRaw,
     playerPerformance,
     playerGwIndex,
-    rosters
+    rosters, compact
   )
 
   const competitions = COMPETITIONS.map(def=>{
@@ -722,6 +722,7 @@ export function generateDashboardData() {
     availableGws:playerGwIndex.gws,
   }
 
+  if (!write) return payload
   const js =
     `// Generato automaticamente da genera-dashboard-data.js\n` +
     `window.FANTASTATS_DATA = ${JSON.stringify(payload)};\n`

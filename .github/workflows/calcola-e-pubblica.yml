@@ -152,7 +152,7 @@ jobs:
 
       - name: Rigenera dashboard data
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
-        run: node genera-dashboard-data.js
+        run: node genera-dashboard-v4.js
 
       - name: Aggiorna calendario Serie A
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
@@ -169,7 +169,7 @@ jobs:
 
           git add fantastats_stagione.xlsx
           git add statistiche_giocatori.xlsx
-          git add dashboard-data.js serie-a-calendar.json
+          git add serie-a-calendar.json
 
           if git diff --cached --quiet; then
             echo "Nessuna modifica da salvare"
@@ -185,11 +185,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p public
-          cp dashboard.html public/index.html
-          cp dashboard-data.js public/dashboard-data.js
-          cp serie-a-calendar.json public/serie-a-calendar.json
-          cp regolamento.html public/regolamento.html
-          cp dashboard-v3.js public/dashboard-v3.js
+          cp v4/index.html v4/app.js v4/style.css public/
+          cp -r v4/data public/data
+          cp serie-a-calendar.json regolamento.html public/
 
       - name: Configura GitHub Pages
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
