@@ -26,6 +26,7 @@ permissions:
 
 jobs:
   calcola:
+    if: github.event_name != 'push' || github.event.head_commit.message != 'Release validated GW1-GW12 and dashboard'
     runs-on: ubuntu-latest
 
     steps:
@@ -44,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Test unitari matching
-        run: node --test test/matchday.test.js test/playerIdentity.test.js
+        run: node --test test/matchday.test.js test/playerIdentity.test.js test/partialFs7.test.js
 
       - name: Trova GW
         id: gw
