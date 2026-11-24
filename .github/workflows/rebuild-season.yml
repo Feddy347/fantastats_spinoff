@@ -1,0 +1,62 @@
+name: Ricostruzione integrale GW1-GW12 (test)
+on:
+  push:
+    branches: [fix/gameweek-retrieval]
+    paths:
+      - 'formazioni/formazioni_GW10.xlsx'
+      - 'formazioni/formazioni_GW11.xlsx'
+      - 'formazioni/formazioni_GW12.xlsx'
+      - '.github/workflows/rebuild-season.yml'
+      - 'test/rebuild-preflight.js'
+      - 'lib/playerIdentity.js'
+      - 'lib/calcolaModalita.js'
+permissions:
+  contents: read
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+      SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Controllo calendario e giocatori di tutte le GW
+        run: node test/rebuild-preflight.js
+      - name: Ricalcolo da zero
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p rebuild-results
+          for gw in $(seq 1 12); do
+            node calcola.js "formazioni/formazioni_GW${gw}.xlsx" --strict-rebuild --out=rebuild-results/fantastats_stagione.xlsx --statsOut=rebuild-results/statistiche_giocatori.xlsx
+            sleep 7
+          done
+      - name: Valida risultati
+        run: |
+          node --input-type=module - <<'NODE'
+          import XLSX from 'xlsx'
+          import assert from 'node:assert/strict'
+          const w=XLSX.readFile('rebuild-results/fantastats_stagione.xlsx',{sheets:['_dati_giornate']})
+          const rows=XLSX.utils.sheet_to_json(w.Sheets._dati_giornate)
+          assert.equal(rows.length,960)
+          for(let gw=1;gw<=12;gw++)assert.equal(rows.filter(r=>Number(r.gw)===gw).length,80)
+          assert.equal(new Set(rows.map(r=>[r.gw,r.fanta,r.modalita,r.utente].join('|'))).size,960)
+          assert(rows.every(r=>Number.isFinite(r.punteggio)))
+          const stats=XLSX.readFile('rebuild-results/statistiche_giocatori.xlsx',{sheets:['_per_gw']})
+          const rr=XLSX.utils.sheet_to_json(stats.Sheets._per_gw)
+          assert.equal(rr.find(r=>Number(r.gw)===12&&Number(r.id)===5585)?.gol,4)
+          console.log('REBUILD_SUMMARY '+JSON.stringify({scores:rows.length,gw4Players:rr.filter(r=>Number(r.gw)===4&&Number(r.minuti)>0).length,fs7Zeros:rows.filter(r=>r.modalita.endsWith('fanta7')&&r.punteggio===0)}))
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rebuild-season
+          path: rebuild-results/
+          if-no-files-found: warn
