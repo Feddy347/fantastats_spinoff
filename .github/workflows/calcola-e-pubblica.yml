@@ -147,6 +147,12 @@ jobs:
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
         run: node genera-dashboard-data.js
 
+      - name: Aggiorna calendario Serie A
+        if: github.ref == 'refs/heads/main' && inputs.dry_run != true
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+        run: node genera-calendario.js
+
       - name: Salva risultati aggiornati nella repo
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
         shell: bash
@@ -156,7 +162,7 @@ jobs:
 
           git add fantastats_stagione.xlsx
           git add statistiche_giocatori.xlsx
-          git add dashboard-data.js
+          git add dashboard-data.js serie-a-calendar.json
 
           if git diff --cached --quiet; then
             echo "Nessuna modifica da salvare"
@@ -174,6 +180,7 @@ jobs:
           mkdir -p public
           cp dashboard.html public/index.html
           cp dashboard-data.js public/dashboard-data.js
+          cp serie-a-calendar.json public/serie-a-calendar.json
           cp regolamento.html public/regolamento.html
           cp dashboard-v3.js public/dashboard-v3.js
 

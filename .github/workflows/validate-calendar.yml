@@ -1,0 +1,31 @@
+name: Diagnostica finale e calendario
+on:
+  push:
+    branches: [fix/gameweek-retrieval]
+    paths:
+      - 'genera-calendario.js'
+      - 'test/diagnose-historical-fs7.js'
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node test/diagnose-historical-fs7.js
+      - name: Inizializza calendario sul branch correttivo
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/fix/gameweek-retrieval
+          node genera-calendario.js
+          git config user.name "Fantastats Bot"
+          git config user.email "actions@github.com"
+          git add serie-a-calendar.json
+          git commit -m "Initialize Serie A calendar snapshot"
+          git push origin HEAD:refs/heads/fix/gameweek-retrieval
