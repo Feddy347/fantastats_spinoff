@@ -113,7 +113,8 @@ jobs:
             exit 0
           fi
           mkdir -p test-results
-          node calcola.js formazioni/formazioni_GW12.xlsx --out=test-results/risultati_GW12.xlsx --statsOut=test-results/statistiche_GW12.xlsx
+          node test/build-reviewed-listone.js
+          node calcola.js formazioni/formazioni_GW12.xlsx --listone=test-results/listone_slug.xlsx --out=test-results/risultati_GW12.xlsx --statsOut=test-results/statistiche_GW12.xlsx
           node --input-type=module - <<'NODE'
           import XLSX from 'xlsx'
           import assert from 'node:assert/strict'

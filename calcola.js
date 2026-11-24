@@ -42,7 +42,7 @@ function loadListone(path) {
     byName.set(key, rec)
     byId.set(r.id, rec)
   }
-  return { byName, byId, all: rows, resolve: makePlayerResolver(rows) }
+  return { byName, byId, all: rows, resolve: makePlayerResolver(rows, wb.Sheets.Alias_storici ? XLSX.utils.sheet_to_json(wb.Sheets.Alias_storici) : []) }
 }
 
 async function main() {
@@ -64,7 +64,7 @@ async function main() {
     console.log('DRY RUN: nessun Excel o dashboard modificato')
     return
   }
-  const listone = loadListone('listone_slug.xlsx')
+  const listone = loadListone(flags.listone || 'listone_slug.xlsx')
   // 4) Costruisci statsById (player listone id -> statsRow) via slug
   const statsById = new Map()
   for (const rec of listone.all) {
@@ -78,7 +78,7 @@ async function main() {
   const { computeAllModes } = await import('./lib/calcolaModalita.js')
   await computeAllModes({ formazioniPath, gw, listone, statsById, flags })
   try {
-  generateDashboardData()
+  if (!flags.out && !flags.statsOut) generateDashboardData()
 } catch (e) {
   console.warn(`Dashboard non aggiornata: ${e.message}`)
 }
