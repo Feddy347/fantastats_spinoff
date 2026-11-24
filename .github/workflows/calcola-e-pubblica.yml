@@ -61,7 +61,38 @@ jobs:
           elif [[ "$GITHUB_REF" != refs/heads/main ]]; then
             GW=12
           else
-            mapfile -t FILES < <(git diff --name-only --diff-filter=AM "$BEFORE" "$GITHUB_SHA" -- formazioni/ | grep -E '^formazioni/formazioni_GW[0-9]+\.xlsx      - name: Rigenera dashboard data
+            mapfile -t FILES < <(git diff --name-only --diff-filter=AM "$BEFORE" "$GITHUB_SHA" -- formazioni/ | grep -E '^formazioni/formazioni_GW[0-9]+\.xlsx$' || true)
+            if [[ ${#FILES[@]} != 1 ]]; then
+              echo "Caricare una sola giornata per push; per ricalcoli usare avvio manuale."
+              exit 1
+            fi
+            GW="$(basename "${FILES[0]}" | sed -E 's/formazioni_GW([0-9]+)\.xlsx/\1/')"
+          fi
+          [[ "$GW" =~ ^([1-9]|[1-2][0-9]|3[0-8])$ ]] || exit 1
+          FILE="formazioni/formazioni_GW${GW}.xlsx"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "gw=$GW" >> "$GITHUB_OUTPUT"
+
+      - name: Calcola Fantastats
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          GW: ${{ steps.gw.outputs.gw }}
+          FILE: ${{ steps.gw.outputs.file }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/main || "$DRY_RUN" == true ]]; then
+            EXTRA=()
+            if [[ "$GW" == 12 ]]; then EXTRA+=(--expect-malen=4); fi
+            node calcola.js "$FILE" --dry-run "${EXTRA[@]}"
+          else
+            test -f "$FILE"
+            node calcola.js "$FILE"
+          fi
+
+      - name: Rigenera dashboard data
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
         run: node genera-dashboard-data.js
 
@@ -107,92 +138,6 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/main' && inputs.dry_run != true
-    needs: calcola
-    runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    permissions:
-      pages: write
-      id-token: write
-
-    steps:
-      - name: Pubblica dashboard
-        id: deployment
-        uses: actions/deploy-pages@v4
- || true)
-            if [[ ${#FILES[@]} != 1 ]]; then
-              echo "Caricare una sola giornata per push; per ricalcoli usare avvio manuale."
-              exit 1
-            fi
-            GW="$(basename "${FILES[0]}" | sed -E 's/formazioni_GW([0-9]+)\.xlsx/\1/')"
-          fi
-          [[ "$GW" =~ ^([1-9]|[1-2][0-9]|3[0-8])$ ]] || exit 1
-          FILE="formazioni/formazioni_GW${GW}.xlsx"
-          echo "file=$FILE" >> "$GITHUB_OUTPUT"
-          echo "gw=$GW" >> "$GITHUB_OUTPUT"
-
-      - name: Calcola Fantastats
-        env:
-          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
-          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
-          GW: ${{ steps.gw.outputs.gw }}
-          FILE: ${{ steps.gw.outputs.file }}
-          DRY_RUN: ${{ inputs.dry_run }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_REF" != refs/heads/main || "$DRY_RUN" == true ]]; then
-            EXTRA=()
-            if [[ "$GW" == 12 ]]; then EXTRA+=(--expect-malen=4); fi
-            node calcola.js "$FILE" --dry-run "${EXTRA[@]}"
-          else
-            test -f "$FILE"
-            node calcola.js "$FILE"
-          fi
-
-      - name: Rigenera dashboard data
-        run: node genera-dashboard-data.js
-
-      - name: Salva risultati aggiornati nella repo
-        shell: bash
-        run: |
-          git config user.name "Fantastats Bot"
-          git config user.email "actions@github.com"
-
-          git add fantastats_stagione.xlsx
-          git add statistiche_giocatori.xlsx
-          git add dashboard-data.js
-
-          if git diff --cached --quiet; then
-            echo "Nessuna modifica da salvare"
-          else
-            git commit -m "Aggiorna risultati GW${{ steps.gw.outputs.gw }}"
-
-            git pull --rebase origin main
-            git push origin main
-          fi
-
-      - name: Prepara sito
-        shell: bash
-        run: |
-          mkdir -p public
-          cp dashboard.html public/index.html
-          cp dashboard-data.js public/dashboard-data.js
-          cp regolamento.html public/regolamento.html
-          cp dashboard-v3.js public/dashboard-v3.js
-
-      - name: Configura GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Carica sito Pages
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: public
-
-  deploy:
     needs: calcola
     runs-on: ubuntu-latest
 
