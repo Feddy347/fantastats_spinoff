@@ -92,6 +92,10 @@ jobs:
             node calcola.js "$FILE"
           fi
 
+      - name: Diagnostica Fantastats7 (sola lettura)
+        if: github.ref == 'refs/heads/fix/gameweek-retrieval' && hashFiles('formazioni/formazioni_GW12.xlsx') != ''
+        run: node test/diagnose-fs7.js
+
       - name: Test completo GW12 con Excel (solo branch correttivo)
         if: github.ref == 'refs/heads/fix/gameweek-retrieval' && steps.gw.outputs.gw == '12'
         env:
