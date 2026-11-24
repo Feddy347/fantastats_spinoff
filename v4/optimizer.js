@@ -30,3 +30,23 @@ export function bestLegal(pool,modules){
  }
  return best?{...best,score:Math.round(best.score*100)/100}:null
 }
+
+/** Historical-only estimate: recent weighted FP conditional on play, multiplied by
+ * observed recent appearance fraction, blended with season values. Missing records
+ * are not assumed to be injuries; participation is an empirical proxy. */
+export function forecastSeven(roster,histories,gws,modules,{excluded=[],recentWeight=.65,window=5}={}){
+ const ex=new Set(excluded.map(String)),weeks=[...new Set(gws.map(Number))].sort((a,b)=>a-b),recent=weeks.slice(-window),rows=[];
+ for(const p of roster){
+  const id=String(p.id??'');if(!id||ex.has(id))continue;
+  const roles=String(p.ruolo_fantastats||'').split(';').map(r=>r.trim()).filter(Boolean);if(!roles.length)continue;
+  const records=(histories[id]||[]).filter(r=>weeks.includes(Number(r.gw))&&Number(r.minuti)>0&&r.scores?.fantastats?.fp!=null&&Number.isFinite(Number(r.scores.fantastats.fp)));
+  if(!records.length)continue;
+  const tail=records.filter(r=>recent.includes(Number(r.gw))),mean=rs=>rs.reduce((s,r)=>s+Number(r.scores.fantastats.fp),0)/rs.length;
+  const seasonAvg=mean(records),recentAvg=tail.length?mean(tail):seasonAvg;
+  const participation=weeks.length?records.length/weeks.length:0,recentParticipation=recent.length?tail.length/recent.length:0;
+  const expected=(recentWeight*recentAvg+(1-recentWeight)*seasonAvg)*(recentWeight*recentParticipation+(1-recentWeight)*participation);
+  rows.push({id,roles,score:Math.round(expected*100)/100,seasonAvg,recentAvg,participation,recentParticipation,played:records.length});
+ }
+ const best=bestLegal(rows,modules);
+ return {best,rows,unknown:roster.filter(p=>!ex.has(String(p.id))&&!rows.some(r=>r.id===String(p.id))).map(p=>p.id)};
+}
