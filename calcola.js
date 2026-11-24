@@ -1,28 +1,10 @@
-// Script principale: legge formazioni.xlsx, pulla le statistiche da Sorare,
-// calcola i punteggi con il motore Fantastats, applica sostituzioni e fasce
-// gol, e scrive risultati_GWn.xlsx con tutte le modalità di test.
-//
-// Uso:  node calcola.js <formazioni.xlsx> <numero_giornata>
-//   opzionale: --from=YYYY-MM-DD --to=YYYY-MM-DD  (finestra date partite;
-//   se omessa, usa una finestra ampia attorno a oggi)
-//
-// Richiede listone_slug.xlsx nella stessa cartella (generato da
-// genera-listone-slug.js).
-
+// Uso: node calcola.js formazioni/formazioni_GW12.xlsx [--dry-run] [--season=2026]
+// Il nome del file identifica la giornata ufficiale. Nessuna finestra relativa a oggi.
 import XLSX from 'xlsx'
 import { generateDashboardData } from './genera-dashboard-data.js'
 import { loadEnv } from './lib/env.js'
 loadEnv()
-import { resolveLineupScore } from './lib/resolver.js'
-import { modulesFor, roleFieldFor } from './lib/roleSystems.js'
-import { scoreToGoals } from './lib/fasceGol.js'
-import {
-  computeSerieAScontri, computeTuttiControTutti, computeFormula1, roundRobinPairs,
-} from './lib/modalita.js'
-import {
-  fetchClubGames, fetchGameStats, statsFromSorare, sleep, bareGameId,
-  SORARE_REQUEST_DELAY_MS, SERIE_A_CLUBS,
-} from './lib/sorare.js'
+import { retrieveMatchday } from './lib/matchday.js'
 
 function parseArgs() {
   const args = process.argv.slice(2)
@@ -33,7 +15,14 @@ function parseArgs() {
       return [k, v ?? true]
     })
   )
-  return { formazioniPath: positional[0], gw: parseInt(positional[1], 10), flags }
+  const formazioniPath = positional[0]
+  const match = /(?:^|[\\/])formazioni_GW([1-9][0-9]*)\.xlsx$/.exec(formazioniPath ?? '')
+  const gw = match ? Number(match[1]) : NaN
+  if (!Number.isInteger(gw) || gw > 38 || (positional[1] && Number(positional[1]) !== gw) || positional.length > 2) {
+    throw new Error('Nome file o numero giornata non valido')
+  }
+  if (flags.from || flags.to) throw new Error('Le finestre manuali non sono più supportate')
+  return { formazioniPath, gw, flags }
 }
 
 // --- Carica il listone-slug come dizionario ---
@@ -55,99 +44,26 @@ function loadListone(path) {
   return { byName, byId, all: rows }
 }
 
-// --- Finestra date attorno a una data centrale ---
-function dateWindow(flags) {
-  const DAY = 24 * 60 * 60 * 1000
-  if (flags.from && flags.to) {
-    return { from: new Date(flags.from).toISOString(), to: new Date(flags.to + 'T23:59:59Z').toISOString() }
-  }
-  const now = Date.now()
-  return { from: new Date(now - 4 * DAY).toISOString(), to: new Date(now + 4 * DAY).toISOString() }
-}
-
 async function main() {
   const { formazioniPath, gw, flags } = parseArgs()
-  if (!formazioniPath || !gw) {
-    console.error('Uso: node calcola.js <formazioni.xlsx> <numero_giornata> [--from=YYYY-MM-DD --to=YYYY-MM-DD]')
-    process.exit(1)
-  }
+
 
   console.log(`\n=== FANTASTATS SPINOFF — Giornata ${gw} ===\n`)
 
-  // 1) Carica listone-slug
+  const season = Number(flags.season ?? 2026)
+  const { games, statsBySlug } = await retrieveMatchday({season,matchday:gw,apiKey:process.env.FOOTBALL_DATA_API_KEY})
+  console.log('Partite validate: '+games.length+'; giocatori: '+statsBySlug.size)
+  if (flags['expect-malen'] !== undefined) {
+    if (flags['dry-run'] !== true) throw new Error('--expect-malen richiede --dry-run')
+    const goals = statsBySlug.get('donyell-malen')?.goals
+    if (goals !== Number(flags['expect-malen'])) throw new Error('Malen: atteso '+flags['expect-malen']+', ottenuto '+goals)
+    console.log('Malen: '+goals+' gol, test superato')
+  }
+  if (flags['dry-run'] === true) {
+    console.log('DRY RUN: nessun Excel o dashboard modificato')
+    return
+  }
   const listone = loadListone('listone_slug.xlsx')
-  console.log(`Listone-slug: ${listone.all.length} giocatori`)
-
-  // 2) Scarica le partite della giornata (finestra date) e le loro statistiche
-  const { from, to } = dateWindow(flags)
-  console.log(`Finestra date partite: ${from.slice(0,10)} -> ${to.slice(0,10)}`)
-  console.log('Scarico le partite Serie A da Sorare...')
-
-  const seenGameIds = new Set()
-const games = []
-
-for (const club of SERIE_A_CLUBS) {
-  try {
-    const clubGames = await fetchClubGames(club.slug, from, to)
-
-    const serieAGames = clubGames.filter(
-      (g) => g.competition?.slug === 'serie-a-it'
-    )
-
-    for (const g of serieAGames) {
-      const bare = bareGameId(g.id)
-
-      if (!seenGameIds.has(bare)) {
-        seenGameIds.add(bare)
-        games.push(g)
-      }
-    }
-  } catch (e) {
-    console.warn(`  ${club.team}: errore partite (${e.message})`)
-  }
-
-  await sleep(SORARE_REQUEST_DELAY_MS)
-}
-
-console.log(`Partite trovate: ${games.length}`)
-
-// 3) Per ogni partita, scarica le statistiche di tutti i giocatori
-console.log('Scarico le statistiche dei giocatori...')
-
-const statsBySlug = new Map()  // sorare_slug -> statsRow
-
-for (const g of games) {
-  try {
-    const gameData = await fetchGameStats(g.id)
-
-    const scores = gameData?.playerGameScores ?? []
-
-    for (const ps of scores) {
-      const slug = ps.anyPlayer?.slug
-
-      if (slug) {
-        statsBySlug.set(
-          slug,
-          statsFromSorare(ps.anyPlayerGameStats)
-        )
-      }
-    }
-
-    console.log(
-      `  ${gameData?.homeTeam?.name} vs ${gameData?.awayTeam?.name}: ${scores.length} giocatori`
-    )
-
-  } catch (e) {
-    console.warn(
-      `  partita ${g.id}: errore stat (${e.message})`
-    )
-  }
-
-  await sleep(SORARE_REQUEST_DELAY_MS)
-}
-
-console.log(`Statistiche raccolte per ${statsBySlug.size} giocatori`)
-
   // 4) Costruisci statsById (player listone id -> statsRow) via slug
   const statsById = new Map()
   for (const rec of listone.all) {
