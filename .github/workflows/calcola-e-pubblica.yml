@@ -46,7 +46,7 @@ jobs:
         run: npm ci
 
       - name: Test unitari matching
-        run: node --test test/matchday.test.js
+        run: node --test test/matchday.test.js test/playerIdentity.test.js
 
       - name: Trova GW
         id: gw

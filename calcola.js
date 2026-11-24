@@ -5,6 +5,7 @@ import { generateDashboardData } from './genera-dashboard-data.js'
 import { loadEnv } from './lib/env.js'
 loadEnv()
 import { retrieveMatchday } from './lib/matchday.js'
+import { makePlayerResolver } from './lib/playerIdentity.js'
 
 function parseArgs() {
   const args = process.argv.slice(2)
@@ -41,7 +42,7 @@ function loadListone(path) {
     byName.set(key, rec)
     byId.set(r.id, rec)
   }
-  return { byName, byId, all: rows }
+  return { byName, byId, all: rows, resolve: makePlayerResolver(rows) }
 }
 
 async function main() {
