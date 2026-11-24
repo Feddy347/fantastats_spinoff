@@ -1,0 +1,29 @@
+name: Aggiorna listone - proposta verificabile
+on:
+  push:
+    branches: [fix/gameweek-retrieval]
+    paths:
+      - 'Quotazioni_Fantacalcio_Stagione_2026_27.xlsx'
+      - 'test/refresh-listone.js'
+      - '.github/workflows/refresh-listone.yml'
+permissions:
+  contents: read
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Genera proposta listone e report
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+        run: node test/refresh-listone.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proposta-listone
+          path: listone-review/
+          if-no-files-found: error
