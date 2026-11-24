@@ -1,0 +1,53 @@
+name: Consolida listone e audit storico (sola lettura risultati)
+on:
+  push:
+    branches: [fix/gameweek-retrieval]
+    paths:
+      - '.github/workflows/audit-storico.yml'
+      - 'test/audit-storico.js'
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Consolida listone verificato solo nel branch correttivo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/fix/gameweek-retrieval
+          node test/build-reviewed-listone.js
+          cp test-results/listone_slug.xlsx listone_slug.xlsx
+          git config user.name "Fantastats Bot"
+          git config user.email "actions@github.com"
+          git add listone_slug.xlsx
+          if ! git diff --cached --quiet; then
+            git commit -m "Consolida listone verificato GW12"
+            git push origin HEAD:refs/heads/fix/gameweek-retrieval
+          fi
+      - name: Leggi snapshot main e confronta statistiche reali
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          NODE_OPTIONS: --max-old-space-size=6144
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit-main
+          git archive 69e56b4c515a176972bae427575d0022c532bea8 formazioni fantastats_stagione.xlsx statistiche_giocatori.xlsx listone_slug.xlsx | tar -x -C audit-main
+          node test/audit-storico.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-storico
+          path: audit-results/
+          if-no-files-found: warn
