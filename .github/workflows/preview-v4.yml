@@ -1,0 +1,58 @@
+name: FantaStats V4 - Preview e regressione
+on:
+  push:
+    branches: [feature/fantastats-v4]
+    paths:
+      - 'v4/**'
+      - 'genera-dashboard-v4.js'
+      - 'test/v4-*.mjs'
+      - '.github/workflows/preview-v4.yml'
+permissions:
+  contents: write
+concurrency:
+  group: preview-v4
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node --test test/matchday.test.js test/playerIdentity.test.js test/partialFs7.test.js
+      - name: Comprimi gli Excel senza cambiare le celle
+        run: node test/v4-compress.mjs
+      - name: Genera dataset modulari
+        run: node genera-dashboard-v4.js
+      - run: |
+          cp serie-a-calendar.json regolamento.html v4/
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Test dati e navigazione Chromium
+        run: |
+          python3 -m http.server 8765 --directory v4 >/tmp/v4-http.log 2>&1 &
+          node test/v4-browser.mjs
+      - name: Prepara preview
+        run: |
+          echo 'Estrarre lo ZIP e, nella cartella estratta, avviare python3 -m http.server 8000. Aprire http://localhost:8000.' > v4/LEGGIMI.txt
+          cp -r preview-screens v4/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: FantaStats-v4-preview
+          path: v4/
+      - name: Consolida compressione solo nel branch V4
+        run: |
+          git config user.name "Fantastats Bot"
+          git config user.email "actions@github.com"
+          git add fantastats_stagione.xlsx statistiche_giocatori.xlsx
+          git rm --ignore-unmatch dashboard-data.js
+          if ! git diff --cached --quiet; then
+            git commit -m "Compact validated workbooks and remove legacy monolithic dashboard data"
+            git push origin HEAD:refs/heads/feature/fantastats-v4
+          fi
