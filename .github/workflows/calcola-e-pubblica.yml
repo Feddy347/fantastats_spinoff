@@ -8,6 +8,7 @@ on:
     paths:
       - 'formazioni/formazioni_GW*.xlsx'
       - 'lib/matchday.js'
+      - 'lib/playerIdentity.js'
       - '.github/workflows/calcola-e-pubblica.yml'
 
   workflow_dispatch:
