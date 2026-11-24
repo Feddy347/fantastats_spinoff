@@ -5,6 +5,7 @@ on:
     paths:
       - 'Quotazioni_Fantacalcio_Stagione_2026_27.xlsx'
       - 'test/refresh-listone.js'
+      - 'lib/sorare.js'
       - '.github/workflows/refresh-listone.yml'
 permissions:
   contents: read
@@ -21,7 +22,13 @@ jobs:
       - name: Genera proposta listone e report
         env:
           SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
-        run: node test/refresh-listone.js
+        run: |
+          if [[ -z "$SORARE_API_KEY" ]]; then
+            echo "SORARE_API_KEY non configurata: uso query paginate anonime."
+          else
+            echo "SORARE_API_KEY configurata (valore non mostrato)."
+          fi
+          node test/refresh-listone.js
       - uses: actions/upload-artifact@v4
         with:
           name: proposta-listone
