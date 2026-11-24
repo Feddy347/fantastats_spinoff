@@ -72,6 +72,12 @@ jobs:
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
           echo "gw=$GW" >> "$GITHUB_OUTPUT"
 
+      - name: Valida Excel prima delle API
+        env:
+          FILE: ${{ steps.gw.outputs.file }}
+          GW: ${{ steps.gw.outputs.gw }}
+        run: node test/validate-formazioni.js "$FILE" "$GW"
+
       - name: Calcola Fantastats
         env:
           FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}

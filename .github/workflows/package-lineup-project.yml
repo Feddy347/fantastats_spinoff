@@ -1,0 +1,37 @@
+name: Pacchetto progetto FantaStats e test validatore
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'test/validate-formazioni.js'
+      - 'project/validate_formazioni.py'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: |
+          mkdir -p project-files
+          cp listone_slug.xlsx rose.xlsx serie-a-calendar.json project-files/
+          cp formazioni/formazioni_GW12.xlsx lib/playerIdentity.js project-files/
+          cp project/* project-files/
+          node --input-type=module - <<'NODE'
+          import XLSX from 'xlsx'
+          import fs from 'node:fs'
+          const data=Array.from({length:12},(_,i)=>{const w=XLSX.readFile('formazioni/formazioni_GW'+(i+1)+'.xlsx');return {gw:i+1,matches:XLSX.utils.sheet_to_json(w.Sheets.calendario_classic)}})
+          fs.writeFileSync('calendario_fantacalcio.json',JSON.stringify(data,null,2))
+          fs.copyFileSync('calendario_fantacalcio.json','project-files/calendario_fantacalcio.json')
+          NODE
+          node test/validate-formazioni.js formazioni/formazioni_GW12.xlsx 12
+          python -m pip install openpyxl
+          python project-files/validate_formazioni.py project-files/formazioni_GW12.xlsx --sources project-files --gw 12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FantaStats-Lineup-Builder
+          path: project-files/
