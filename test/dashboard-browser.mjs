@@ -24,7 +24,18 @@ for(const hash of ['league/classic','league/mantra','comp/C_scontri','comp/M_sco
 await page.evaluate(h=>location.hash=h,hash)
 await page.waitForTimeout(150)
 assert((await page.locator('#view').innerText()).trim().length>30,hash)
-if(hash==='gw/C_fanta7/6')assert.match(await page.locator('#view').innerText(),/Posizione scoperta/)
+if(hash==='gw/C_fanta7/6'){
+ const match=page.locator('.match-card').filter({has:page.locator('.teamname').getByText('Schiaffield Wednesday',{exact:true})})
+ assert.equal(await match.count(),1)
+ await match.getByRole('button',{name:/Mostra formazioni e voti/}).click()
+ const lineup=match.locator('.lineup').filter({has:page.getByRole('heading',{name:'Schiaffield Wednesday',exact:true})})
+ const empty=lineup.locator('.player-row').filter({hasText:'Posizione scoperta'})
+ await empty.waitFor({state:'visible'})
+ assert.equal(await empty.count(),1)
+ assert.match(await empty.innerText(),/0 FP/)
+ assert.match(await empty.innerText(),/\bC\b/)
+ console.log('EMPTY_SLOT_UI_OK '+await empty.innerText())
+}
 }
 assert.deepEqual(errors,[])
 console.log('DASHBOARD_OK '+JSON.stringify({competitions:info.competitions,playerRows:info.rows,malenGoals:info.malen.gol,partial:info.partial}))
