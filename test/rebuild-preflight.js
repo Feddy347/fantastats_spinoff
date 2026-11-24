@@ -20,7 +20,7 @@ for(let gw=1;gw<=12;gw++){
   for(const user of users){
    const team=rr.filter(r=>r.utente===user)
    const n=team.filter(r=>String(r.tipo).toLowerCase().startsWith('tit')).length
-   if(n!==11)shape.push({gw,league,user,starters:n})
+   if(n!==11)shape.push({gw,league,user,starters:n,rows:team})
   }
   for(const r of rr){
    const hit=resolve(r.giocatore,r.squadra)
@@ -32,4 +32,5 @@ fs.mkdirSync('rebuild-results',{recursive:true})
 fs.writeFileSync('rebuild-results/preflight.json',JSON.stringify({missing,shape},null,2))
 console.log('REBUILD_MISSING '+JSON.stringify(missing))
 console.log('REBUILD_SHAPE '+JSON.stringify(shape))
+if(shape.length)throw Error('Incomplete lineups: see REBUILD_SHAPE')
 if(missing.length)throw Error('Resolve preflight identities before rebuilding')
