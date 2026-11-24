@@ -799,6 +799,7 @@
     const baseStarterBySlot = new Map(baseStarters.map(r=>[Number(r.slot_index),r]))
 
     const renderActual = r => {
+      if(r.player_id==null || r.player_id==='')return `<div class="player-row did-not-play"><span class="role">${esc(r.ruolo||'')}</span><span>Posizione scoperta</span><span class="pscore">0 FP</span></div>`
       const substituted = Number(r.sostituzione) === 1
 
       return `<div class="player-row ${substituted?'sub-in':''}">
@@ -834,15 +835,15 @@
     let extra = ''
 
     if(c.scoreMode === 'fanta7'){
-      const excludedStarters = baseStarters.filter(r=>!actual.some(a=>String(a.giocatore)===String(r.giocatore)))
-      const otherBench = baseBench.filter(r=>!actual.some(a=>String(a.giocatore)===String(r.giocatore)))
+      const excludedStarters = baseStarters.filter(r=>!actual.some(a=>a.player_id!=null && r.player_id!=null && String(a.player_id)===String(r.player_id)))
+      const otherBench = baseBench.filter(r=>!actual.some(a=>a.player_id!=null && r.player_id!=null && String(a.player_id)===String(r.player_id)))
       const fanta7Bench = [...excludedStarters,...otherBench]
 
       if(fanta7Bench.length) {
         extra = `<div class="bench-title">Panchina</div>${fanta7Bench.map(renderGray).join('')}`
       }
     } else {
-      const unusedBench = baseBench.filter(r=>!actual.some(a=>String(a.giocatore)===String(r.giocatore)))
+      const unusedBench = baseBench.filter(r=>!actual.some(a=>a.player_id!=null && r.player_id!=null && String(a.player_id)===String(r.player_id)))
 
       if(unusedBench.length){
         extra = `<div class="bench-title">Panchina non utilizzata</div>${unusedBench.map(r=>`

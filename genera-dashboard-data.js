@@ -2,6 +2,7 @@ import XLSX from 'xlsx'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { makePlayerResolver } from './lib/playerIdentity.js'
 import { fsRateFromPoints } from './lib/fsRate.js'
 import { goalThresholds } from './lib/fasceGol.js'
 
@@ -164,9 +165,11 @@ function readFormationData(playerGw) {
   const formations = {}
   const classicCalendars = {}
   const statIndex = new Map()
+  const listone = XLSX.readFile(path.join(ROOT,'listone_slug.xlsx'))
+  const resolve = makePlayerResolver(rows(listone,listone.SheetNames[0]),rows(listone,'Alias_storici'))
 
   for (const r of playerGw) {
-    const key = `${n(r.gw)}|${String(r.nome ?? '').trim().toLowerCase()}|${String(r.squadra ?? '').trim().toLowerCase()}`
+    const key = `${n(r.gw)}|${String(r.id)}`
     statIndex.set(key, r)
   }
 
@@ -179,7 +182,9 @@ function readFormationData(playerGw) {
         const user = String(r.utente ?? '').trim()
         if (!user) continue
         const rec = { ...r }
-        const key = `${file.gw}|${String(r.giocatore ?? '').trim().toLowerCase()}|${String(r.squadra ?? '').trim().toLowerCase()}`
+        const player = resolve(r.giocatore,r.squadra)
+        rec.player_id = player?.id ?? null
+        const key = `${file.gw}|${String(rec.player_id)}`
         rec.stats = statIndex.get(key) ?? null
         if (!formations[String(file.gw)][league][user]) formations[String(file.gw)][league][user] = []
         formations[String(file.gw)][league][user].push(rec)
