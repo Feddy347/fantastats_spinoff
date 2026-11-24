@@ -92,6 +92,10 @@ jobs:
             node calcola.js "$FILE"
           fi
 
+      - name: Confronto ID listone
+        if: github.ref == 'refs/heads/fix/gameweek-retrieval'
+        run: node test/check-listone.js
+
       - name: Diagnostica Fantastats7 (sola lettura)
         if: github.ref == 'refs/heads/fix/gameweek-retrieval' && hashFiles('formazioni/formazioni_GW12.xlsx') != ''
         run: node test/diagnose-fs7.js
