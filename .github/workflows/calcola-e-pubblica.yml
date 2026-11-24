@@ -92,6 +92,50 @@ jobs:
             node calcola.js "$FILE"
           fi
 
+      - name: Test completo GW12 con Excel (solo branch correttivo)
+        if: github.ref == 'refs/heads/fix/gameweek-retrieval' && steps.gw.outputs.gw == '12'
+        env:
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f formazioni/formazioni_GW12.xlsx ]]; then
+            echo "Caricare formazioni/formazioni_GW12.xlsx nel branch correttivo per il test completo."
+            exit 0
+          fi
+          mkdir -p test-results
+          node calcola.js formazioni/formazioni_GW12.xlsx --out=test-results/risultati_GW12.xlsx --statsOut=test-results/statistiche_GW12.xlsx
+          node --input-type=module - <<'NODE'
+          import XLSX from 'xlsx'
+          import assert from 'node:assert/strict'
+          const wb = XLSX.readFile('test-results/risultati_GW12.xlsx')
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets._dati_giornate)
+          assert(rows.length > 0 && rows.every(r => r.gw === 12 && Number.isFinite(r.punteggio)))
+          const input = XLSX.readFile('formazioni/formazioni_GW12.xlsx')
+          for (const fanta of ['Classic','Mantra']) {
+            const users = new Set(XLSX.utils.sheet_to_json(input.Sheets[fanta]).map(r=>String(r.utente).trim()))
+            const result = rows.filter(r=>r.fanta===fanta)
+            assert.equal(new Set(result.map(r=>r.modalita)).size,5)
+            assert.equal(result.length,users.size*5)
+            for (const user of users) assert.equal(result.filter(r=>r.utente===user).length,5)
+          }
+          console.log('GW12_SCORES_JSON '+JSON.stringify(rows))
+          const stats = XLSX.readFile('test-results/statistiche_GW12.xlsx')
+          const malen = XLSX.utils.sheet_to_json(stats.Sheets._per_gw).filter(r=>String(r.nome).toLowerCase().includes('malen'))
+          assert.equal(malen.length,1)
+          assert.equal(malen[0].gol,4)
+          console.log('GW12_MALEN_JSON '+JSON.stringify(malen))
+          NODE
+
+      - name: Salva Excel test GW12 come artifact
+        if: github.ref == 'refs/heads/fix/gameweek-retrieval' && steps.gw.outputs.gw == '12' && hashFiles('test-results/risultati_GW12.xlsx') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: risultati-test-GW12
+          path: test-results/
+          if-no-files-found: error
+
       - name: Rigenera dashboard data
         if: github.ref == 'refs/heads/main' && inputs.dry_run != true
         run: node genera-dashboard-data.js
