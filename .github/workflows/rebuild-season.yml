@@ -8,10 +8,11 @@ on:
       - 'formazioni/formazioni_GW12.xlsx'
       - '.github/workflows/rebuild-season.yml'
       - 'test/rebuild-preflight.js'
+      - 'test/repair-toro-gw12.js'
       - 'lib/playerIdentity.js'
       - 'lib/calcolaModalita.js'
 permissions:
-  contents: read
+  contents: write
 jobs:
   rebuild:
     runs-on: ubuntu-latest
@@ -27,6 +28,17 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Ripristina formazione TORO LOCO da screenshot
+        run: |
+          test "$GITHUB_REF" = refs/heads/fix/gameweek-retrieval
+          node test/repair-toro-gw12.js
+          git config user.name "Fantastats Bot"
+          git config user.email "actions@github.com"
+          git add formazioni/formazioni_GW12.xlsx
+          if ! git diff --cached --quiet; then
+            git commit -m "Restore missing Zielinski in TORO LOCO GW12"
+            git push origin HEAD:refs/heads/fix/gameweek-retrieval
+          fi
       - name: Controllo calendario e giocatori di tutte le GW
         run: node test/rebuild-preflight.js
       - name: Ricalcolo da zero
