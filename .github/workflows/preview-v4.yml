@@ -24,7 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: node --test test/matchday.test.js test/playerIdentity.test.js test/partialFs7.test.js
+      - run: node --test test/matchday.test.js test/playerIdentity.test.js test/partialFs7.test.js test/v4-optimizer.test.mjs
       - name: Comprimi gli Excel senza cambiare le celle
         run: node test/v4-compress.mjs
       - name: Genera dataset modulari

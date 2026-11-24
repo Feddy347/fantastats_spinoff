@@ -185,7 +185,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p public
-          cp v4/index.html v4/app.js v4/style.css public/
+          cp v4/index.html v4/app.js v4/style.css v4/optimizer.js public/
           cp -r v4/data public/data
           cp serie-a-calendar.json regolamento.html public/
 

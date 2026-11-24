@@ -4,6 +4,8 @@ import {fileURLToPath} from 'node:url'
 import XLSX from 'xlsx'
 import {generateDashboardData} from './genera-dashboard-data.js'
 import {calculateScore} from './lib/scoreEngine.js'
+import {modulesFor} from './lib/roleSystems.js'
+import {candidate,bestLegal} from './v4/optimizer.js'
 import {fsRateFromPoints} from './lib/fsRate.js'
 const systems=['classic','mantra','fantastats']
 const num=v=>Number(v)||0
@@ -28,19 +30,21 @@ export function generateV4(out='v4/data'){
  }
  const id=String(r.id);if(!history.has(id))history.set(id,[]);history.get(id).push({...record,scores})
  }
- const summaries={}
+ const summaries={},teamAnalytics={},moduleDefs=Object.fromEntries(systems.map(s=>[s,modulesFor(s)]))
  for(const gw of d.availableGws){const details=d.details[String(gw)]||{},formations=d.formations[String(gw)]||{}, games={}
  for(const c of d.competitions){games[c.id]=c.gameweeks[String(gw)];for(const [team,rs] of Object.entries(details[c.id]||{}))for(const r of rs){if(r.player_id==null||r.player_id==='')continue;const id=String(r.player_id);if(!contexts.has(id))contexts.set(id,[]);contexts.get(id).push({gw,comp:c.id,team,role:r.ruolo,fp:r.punteggio,rate:r.fs_rate,sub:r.sostituzione})}}
- for(const ts of Object.values(formations))for(const rs of Object.values(ts))for(const r of rs){if(r.stats){r.stats={minuti:r.stats.minuti,punteggio:r.stats.punteggio,punteggio_classic:r.stats.punteggio_classic,punteggio_mantra:r.stats.punteggio_mantra,punteggio_fantastats:r.stats.punteggio_fantastats,punteggio_flop_classic:r.stats.punteggio_flop_classic,punteggio_flop_mantra:r.stats.punteggio_flop_mantra,punteggio_flop_fantastats:r.stats.punteggio_flop_fantastats}}}
+ for(const ts of Object.values(formations))for(const rs of Object.values(ts))for(const r of rs){if(r.stats){r.stats={minuti:r.stats.minuti,punteggio:r.stats.punteggio,punteggio_classic:r.stats.punteggio_classic,punteggio_mantra:r.stats.punteggio_mantra,punteggio_fantastats:r.stats.punteggio_fantastats,punteggio_flop_classic:r.stats.punteggio_flop_classic,punteggio_flop_mantra:r.stats.punteggio_flop_mantra,punteggio_flop_fantastats:r.stats.punteggio_flop_fantastats,ruolo_classic:r.stats.ruolo_classic,ruolo_mantra:r.stats.ruolo_mantra,ruolo_fantastats:r.stats.ruolo_fantastats}}}
+ for(const c of d.competitions){for(const [team,rs] of Object.entries(details[c.id]||{})){const submitted=formations[c.league]?.[team]||[],used=new Set(rs.filter(r=>r.player_id!=null).map(r=>String(r.player_id)));const unused=submitted.filter(r=>!used.has(String(r.player_id))&&num(r.stats?.minuti)>0);const key='punteggio_'+(c.isFlop?'flop_':'')+c.roleSystem;const vals=unused.map(r=>r.stats[key]).filter(v=>v!=null);(teamAnalytics[c.id]??={})[team]??={};teamAnalytics[c.id][team][gw]={subs:rs.filter(r=>num(r.sostituzione)===1).length,vacancies:rs.filter(r=>r.player_id==null||r.player_id==='').length,unused:unused.length,unusedFp:vals.length===unused.length?Math.round(vals.reduce((a,b)=>a+Number(b),0)*100)/100:null}}}
  const actionPool=[],actionMap=new Map();for(const ts of Object.values(details))for(const rs of Object.values(ts))for(const r of rs){const key=JSON.stringify(r.action_details||[]);if(!actionMap.has(key)){actionMap.set(key,actionPool.length);actionPool.push(r.action_details||[])}r.actionRef=actionMap.get(key);delete r.action_details}
  put('gw/'+gw,{details,formations,actionPool})
  const stats=d.playerGw.filter(r=>Number(r.gw)===gw&&num(r.minuti)>0).map(r=>({id:r.id,fp:r.punteggio_fantastats,flop:r.punteggio_flop_fantastats,minutes:r.minuti,goals:r.gol}))
- summaries[gw]={games,top:stats.slice().sort((a,b)=>num(b.fp)-num(a.fp)).slice(0,10),flop:stats.slice().sort((a,b)=>num(b.flop)-num(a.flop)).slice(0,10)}
+ const real=d.playerGw.filter(r=>Number(r.gw)===gw);const bestXI=bestLegal(real.map(r=>candidate(r,'classic')),moduleDefs.classic),flopXI=bestLegal(real.map(r=>candidate(r,'classic',true)),moduleDefs.classic)
+ summaries[gw]={games,bestXI,flopXI,top:stats.slice().sort((a,b)=>num(b.fp)-num(a.fp)).slice(0,10),flop:stats.slice().sort((a,b)=>num(b.flop)-num(a.flop)).slice(0,10)}
  }
  const index=[...players.values()].map(p=>{const h=(history.get(String(p.id))||[]).sort((a,b)=>a.gw-b.gw), profile=d.playerPerformance[String(p.id)]?.systems||{}, last=h.at(-1);const metrics={};for(const s of systems)for(const m of ['normal','flop']){const k=(m==='flop'?'flop_':'')+s;const vals=h.filter(r=>num(r.minuti)>0&&r.scores[k]).map(r=>r.scores[k].fp);metrics[k]={...profile[s]?.[m],total:vals.length?Math.round(vals.reduce((a,b)=>a+b,0)*100)/100:null,last:last?.scores[k]?.fp??null,lastGw:last?.gw??null};delete metrics[k].last5}
  const item={...p,owners:owners[String(p.id)]||[],metrics};put('players/'+p.id,{history:h,contexts:contexts.get(String(p.id))||[]});return item})
  const competitions=d.competitions.map(({gameweeks,...c})=>c)
- put('core',{generated:d.generated,leagues:d.leagues,competitions,rosters:d.rosters,players:index,availableGws:d.availableGws,gameweeks:summaries})
+ put('core',{generated:d.generated,leagues:d.leagues,competitions,rosters:d.rosters,players:index,availableGws:d.availableGws,gameweeks:summaries,teamAnalytics,moduleDefs})
  const total=Object.values(sizes).reduce((a,b)=>a+b,0)
  fs.rmSync(target,{recursive:true,force:true});fs.renameSync(stage,target)
  console.log('V4_DATA '+JSON.stringify({core:sizes.core,total,files:Object.keys(sizes).length,players:index.length,gws:d.availableGws,contexts:[...contexts.values()].reduce((a,b)=>a+b.length,0)}))
