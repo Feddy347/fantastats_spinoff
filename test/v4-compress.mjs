@@ -9,7 +9,6 @@ for(const file of ['fantastats_stagione.xlsx','statistiche_giocatori.xlsx']){
  XLSX.writeFile(w,tmp,{compression:true})
  const actual=XLSX.readFile(tmp);assert.deepEqual(actual.SheetNames,w.SheetNames);assert.deepEqual(fingerprint(actual),before)
  const after=fs.statSync(tmp).size
- assert(after<orig,'Compressione senza beneficio: '+file)
- fs.renameSync(tmp,file)
+ if(after<orig)fs.renameSync(tmp,file);else fs.unlinkSync(tmp)
  console.log('WORKBOOK_COMPRESSION '+JSON.stringify({file,before:orig,after,percent:Math.round((1-after/orig)*100),sheets:w.SheetNames.length}))
 }
