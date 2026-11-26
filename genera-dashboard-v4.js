@@ -7,7 +7,7 @@ import {deriveFantastats7} from './lib/calcolaModalita.js'
 import {makePlayerResolver} from './lib/playerIdentity.js'
 import {calculateScore} from './lib/scoreEngine.js'
 import {modulesFor} from './lib/roleSystems.js'
-import {candidate,bestLegal} from './v4/optimizer.js'
+import {candidate,bestLegal,playerLeaders} from './v4/optimizer.js'
 import {fsRateFromPoints} from './lib/fsRate.js'
 const systems=['classic','mantra','fantastats']
 const num=v=>Number(v)||0
@@ -51,12 +51,12 @@ export function generateV4(out='v4/data'){
  put('gw/'+gw,{details,formations,actionPool})
  const stats=d.playerGw.filter(r=>Number(r.gw)===gw&&num(r.minuti)>0).map(r=>({id:r.id,fp:r.punteggio_fantastats,flop:r.punteggio_flop_fantastats,minutes:r.minuti,goals:r.gol}))
  const real=d.playerGw.filter(r=>Number(r.gw)===gw);const bestXI=bestLegal(real.map(r=>candidate(r,'classic')),moduleDefs.classic),flopXI=bestLegal(real.map(r=>candidate(r,'classic',true)),moduleDefs.classic)
- summaries[gw]={games,leaders,bestXI,flopXI,top:stats.slice().sort((a,b)=>num(b.fp)-num(a.fp)).slice(0,10),flop:stats.slice().sort((a,b)=>num(b.flop)-num(a.flop)).slice(0,10)}
+ summaries[gw]={games,leaders,playerLeaders:playerLeaders(realRows),bestXI,flopXI,top:stats.slice().sort((a,b)=>num(b.fp)-num(a.fp)).slice(0,10),flop:stats.slice().sort((a,b)=>num(b.flop)-num(a.flop)).slice(0,10)}
  }
  const index=[...players.values()].map(p=>{const h=(history.get(String(p.id))||[]).sort((a,b)=>a.gw-b.gw), profile=d.playerPerformance[String(p.id)]?.systems||{}, last=h.at(-1);const metrics={};for(const s of systems)for(const m of ['normal','flop']){const k=(m==='flop'?'flop_':'')+s;const vals=h.filter(r=>num(r.minuti)>0&&r.scores[k]).map(r=>r.scores[k].fp);metrics[k]={...profile[s]?.[m],total:vals.length?Math.round(vals.reduce((a,b)=>a+b,0)*100)/100:null,last:last?.scores[k]?.fp??null,lastGw:last?.gw??null};delete metrics[k].last5}
  const item={...p,owners:owners[String(p.id)]||[],metrics};put('players/'+p.id,{history:h,contexts:contexts.get(String(p.id))||[]});return item})
  const competitions=d.competitions.map(({gameweeks,...c})=>c)
- put('core',{generated:d.generated,leagues:d.leagues,competitions,rosters:d.rosters,players:index,availableGws:d.availableGws,gameweeks:summaries,teamAnalytics,moduleDefs,seasonLeaders:Object.fromEntries(Object.entries(seasonLeaders).map(([id,rs])=>[id,Object.values(rs).map(r=>({...r,fp:Math.round(r.fp*100)/100})).sort((a,b)=>b.fp-a.fp).slice(0,3)]))})
+ put('core',{generated:d.generated,leagues:d.leagues,competitions,rosters:d.rosters,players:index,availableGws:d.availableGws,gameweeks:summaries,teamAnalytics,moduleDefs,seasonPlayerLeaders:playerLeaders(d.playerGw),seasonLeaders:Object.fromEntries(Object.entries(seasonLeaders).map(([id,rs])=>[id,Object.values(rs).map(r=>({...r,fp:Math.round(r.fp*100)/100})).sort((a,b)=>b.fp-a.fp).slice(0,3)]))})
  const total=Object.values(sizes).reduce((a,b)=>a+b,0)
  fs.rmSync(target,{recursive:true,force:true});fs.renameSync(stage,target)
  console.log('V4_DATA '+JSON.stringify({core:sizes.core,total,files:Object.keys(sizes).length,players:index.length,gws:d.availableGws,contexts:[...contexts.values()].reduce((a,b)=>a+b.length,0)}))

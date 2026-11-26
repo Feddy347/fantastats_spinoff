@@ -20,3 +20,11 @@ test('forecast uses past weeks only, respects exclusions and maximizes cover',()
  assert.equal(result.best.covered,2);assert.deepEqual(result.best.players.map(p=>p.id),['1','3']);assert.equal(result.best.score,12);
  assert.equal(forecastSeven(roster,h,[1,2],mod).best.score,14);
 });
+
+import {playerLeaders,macroRoles,unlimitedGoalProgress,historyPoint,valueTones} from '../v4/optimizer.js'
+test('home leaders use objective scores, exclude nonplayed and split macro roles',()=>{
+ const rows=[{id:1,minuti:90,ruolo_classic:'A',punteggio_classic:8,punteggio_fantastats:9,punteggio_flop_classic:-2},{id:2,minuti:0,ruolo_classic:'A',punteggio_classic:99},{id:1,minuti:90,ruolo_classic:'A',punteggio_classic:4,punteggio_fantastats:5,punteggio_flop_classic:1},{id:3,minuti:90,ruolo_classic:'P',punteggio_classic:-1}];
+ const r=playerLeaders(rows);assert.deepEqual(r.normal.A,[{id:1,fp:12,played:2}]);assert.equal(r.fantastats.A[0].fp,14);assert.equal(r.flop.A[0].fp,-1);assert.deepEqual(macroRoles('D; C'),['D','C']);
+})
+test('unlimited goal bands extend normal and flop',()=>{assert.deepEqual(unlimitedGoalProgress(111,[55,63,71,79,87,95]),{goals:8,nextThreshold:119,missing:8,progress:0});assert.equal(unlimitedGoalProgress(11,[-25,-19,-13,-7,-1,5]).nextThreshold,17);assert.equal(unlimitedGoalProgress(0,[55,63]).nextThreshold,55)})
+test('zero only if documented, negative values preserved, best/worst correct',()=>{assert.equal(historyPoint({minuti:0},'classic'),0);assert.equal(historyPoint(undefined,'classic'),null);assert.equal(historyPoint({minuti:80,scores:{classic:{fp:-2}}},'classic'),-2);assert.deepEqual(valueTones([5,2,null,5]),['positive','negative','','positive']);assert.deepEqual(valueTones([5,2],-1),['negative','positive']);assert.deepEqual(valueTones([0,0]),['',''])})

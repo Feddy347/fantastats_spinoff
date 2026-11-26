@@ -50,3 +50,21 @@ export function forecastSeven(roster,histories,gws,modules,{excluded=[],recentWe
  const best=bestLegal(rows,modules);
  return {best,rows,unknown:roster.filter(p=>!ex.has(String(p.id))&&!rows.some(r=>r.id===String(p.id))).map(p=>p.id)};
 }
+
+export const HOME_MODES={normal:'punteggio_classic',fantastats:'punteggio_fantastats',flop:'punteggio_flop_classic'}
+export function macroRoles(value){return [...new Set(String(value??'').toUpperCase().split(/[;,/\s]+/).filter(x=>['P','D','C','A'].includes(x)))]}
+export function playerLeaders(rows,limit=5){
+ const accum=new Map()
+ for(const r of rows){
+  if(r.id==null||!(Number(r.minuti)>0))continue
+  for(const role of macroRoles(r.ruolo_classic??r.ruolo))for(const [mode,field] of Object.entries(HOME_MODES)){
+   const raw=r[field];if(raw==null||raw===''||!Number.isFinite(Number(raw)))continue
+   const key=mode+'|'+role+'|'+r.id,entry=accum.get(key)||{id:r.id,role,mode,fp:0,played:0}
+   entry.fp+=Number(raw);entry.played++;accum.set(key,entry)
+  }
+ }
+ return Object.fromEntries(Object.keys(HOME_MODES).map(mode=>[mode,Object.fromEntries(['P','D','C','A'].map(role=>[role,[...accum.values()].filter(r=>r.mode===mode&&r.role===role).map(({id,fp,played})=>({id,fp:Math.round(fp*100)/100,played})).sort((a,b)=>b.fp-a.fp||String(a.id).localeCompare(String(b.id))).slice(0,limit)]))]))
+}
+export function unlimitedGoalProgress(score,thresholds){if(score==null||!Number.isFinite(Number(score))||thresholds?.length<2)return null;const first=Number(thresholds[0]),step=Number(thresholds[1])-first,s=Number(score);if(!Number.isFinite(first)||!(step>0))return null;const goals=s<first?0:1+Math.floor((s-first)/step),nextThreshold=first+goals*step;return {goals,nextThreshold,missing:Math.round(Math.max(0,nextThreshold-s)*100)/100,progress:Math.max(0,Math.min(100,100*(s-(nextThreshold-step))/step))}}
+export function historyPoint(row,key){if(!row||row.minuti==null)return null;if(Number(row.minuti)===0)return 0;const v=row.scores?.[key]?.fp;return v==null||v===''||!Number.isFinite(Number(v))?null:Number(v)}
+export function valueTones(values,direction=1){const clean=values.filter(v=>v!=null&&v!==''&&Number.isFinite(Number(v))).map(Number);const hi=Math.max(...clean),lo=Math.min(...clean);return values.map(v=>v==null||v===''||!Number.isFinite(Number(v))||clean.length<2||hi===lo?'':Number(v)===(direction>0?hi:lo)?'positive':Number(v)===(direction>0?lo:hi)?'negative':'')}

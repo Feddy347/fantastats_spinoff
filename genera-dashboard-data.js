@@ -97,29 +97,11 @@ function percentileRank(value, pool) {
 }
 
 function goalProgress(score, thresholds) {
-  const s = Number(score)
-  if (!Number.isFinite(s) || !thresholds?.length) {
-    return { goals:0, nextThreshold:null, missing:null }
-  }
-
-  let goals = 0
-  for (const t of thresholds) {
-    if (s >= t) goals++
-    else break
-  }
-
-  const nextThreshold = goals < thresholds.length ? thresholds[goals] : null
-
-  return {
-    goals,
-    nextThreshold,
-    missing:
-      nextThreshold == null
-        ? null
-        : round2(Math.max(0, nextThreshold - s)),
-  }
+  const s=Number(score), first=Number(thresholds?.[0]), step=Number(thresholds?.[1])-first
+  if(!Number.isFinite(s)||!Number.isFinite(first)||!(step>0))return {goals:0,nextThreshold:null,missing:null}
+  const goals=s<first?0:1+Math.floor((s-first)/step),nextThreshold=first+goals*step
+  return {goals,nextThreshold,missing:round2(Math.max(0,nextThreshold-s))}
 }
-
 function roundRobinPairs(users, gw) {
   const arr = [...users].sort()
   if (arr.length % 2 === 1) arr.push('__RIPOSA__')
