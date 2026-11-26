@@ -1,59 +1,61 @@
-name: Pubblicazione definitiva stagione ricostruita
+name: Pubblica FantaStats V4 ufficiale
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/release-rebuilt-season.yml'
+      - 'v4/**'
+      - 'genera-dashboard-v4.js'
+      - 'genera-dashboard-data.js'
+      - 'test/v4-browser.mjs'
+      - 'test/v4-optimizer.test.mjs'
+      - 'regolamento.html'
+  workflow_dispatch:
 permissions:
-  contents: write
-  actions: read
+  contents: read
   pages: write
   id-token: write
 concurrency:
-  group: release-rebuilt-season
+  group: fantastats-official-pages
   cancel-in-progress: false
 jobs:
   prepare:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@v4
-        with:
-          name: rebuild-season
-          run-id: 45488174113
-          github-token: ${{ github.token }}
-          path: validated
-      - name: Ripristina esattamente gli Excel validati
+      - name: Test unitari e sintassi
         run: |
-          cp validated/fantastats_stagione.xlsx validated/statistiche_giocatori.xlsx .
-          node test/rebuild-preflight.js
-          node --test test/matchday.test.js test/playerIdentity.test.js test/partialFs7.test.js
-          node genera-dashboard-data.js
+          node --test test/matchday.test.js test/playerIdentity.test.js test/partialFs7.test.js test/v4-optimizer.test.mjs
+          node --check v4/app.js
+          node --check v4/optimizer.js
+      - name: Genera V4 dagli Excel correnti senza ricalcolo
+        run: |
+          node genera-dashboard-v4.js
+          cp serie-a-calendar.json regolamento.html v4/
+      - name: Verifica tutti i dati e la navigazione
+        run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
-      - name: Verifica browser prima della pubblicazione
-        run: |
-          python3 -m http.server 8765 >/tmp/dashboard-http.log 2>&1 &
-          node test/dashboard-browser.mjs
-      - name: Salva risultati definitivi su main
-        run: |
-          git config user.name "Fantastats Bot"
-          git config user.email "actions@github.com"
-          git add fantastats_stagione.xlsx statistiche_giocatori.xlsx dashboard-data.js
-          git commit -m "Publish validated GW1-GW12 Excel and dashboard data"
-          git push origin HEAD:refs/heads/main
+          python3 -m http.server 8765 --directory v4 >/tmp/v4-http.log 2>&1 &
+          node test/v4-browser.mjs
       - name: Prepara sito ufficiale
         run: |
           mkdir -p public
-          cp dashboard.html public/index.html
-          cp dashboard-data.js dashboard-v3.js regolamento.html serie-a-calendar.json public/
+          cp v4/index.html v4/app.js v4/style.css v4/optimizer.js public/
+          cp -r v4/data public/data
+          cp serie-a-calendar.json regolamento.html public/
+          test -s public/data/core.json
+          test -s public/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
